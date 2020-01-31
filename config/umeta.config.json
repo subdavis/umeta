@@ -1,0 +1,13 @@
+{
+  "database_uri": "sqlite:///test.db",
+  "sources": [
+    {
+      "type": "disk",
+      "name": "disk1",
+      "properties": {
+        "root": "/home/brandon/tmp",
+        "cmd": "find {}"
+      }
+    }
+  ]
+}

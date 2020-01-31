@@ -1,0 +1,3 @@
+include setup.py
+graft umeta
+global-exclude *.pyc *.pyo __pycache__ *.egg-info
