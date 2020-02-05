@@ -5,8 +5,7 @@
       "type": "disk",
       "name": "disk1",
       "properties": {
-        "root": "/home/brandon/tmp",
-        "cmd": "find {}"
+        "root": "/home/brandon/github.com/d3vue"
       }
     }
   ]

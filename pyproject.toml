@@ -1,5 +1,30 @@
 [tool.black]
-line-length = 81
+line-length = 79
 skip-string-normalization = true
 target-version = ['py37']
 exclude='\.eggs|\.git|\.mypy_cache|\.tox|\.venv|_build|buck-out|build|dist|venv'
+
+[tool.poetry]
+name = "umeta"
+version = "0.1.0"
+description = ""
+authors = ["Brandon Davis <umeta@subdavis.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.6"
+click = "^7.0"
+fastapi = "^0.47.1"
+marshmallow-sqlalchemy = "^0.21.0"
+marshmallow-dataclass = "^7.2.1"
+marshmallow-union = "^0.1.12"
+requests = "^2.22.0"
+pyvips = "^2.1.11"
+
+[tool.poetry.plugins."console_scripts"]
+"umeta" = "umeta.cli:cli"
+
+[tool.poetry.dev-dependencies]
+black = "^19.10b0"
+flake8 = "^3.7.9"
+mypy = "^0.761"
+sqlalchemy-stubs = "^0.3"

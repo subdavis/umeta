@@ -19,7 +19,6 @@ class S3:
 @dataclass
 class Disk:
     root: str
-    cmd: str
 
 
 @dataclass
@@ -45,3 +44,6 @@ def get_config() -> Config:
         config = ConfigSchema().load(config_json)
         config.database_uri = os.getenv('DATABASE_URI', config.database_uri)
         return config
+
+
+config = get_config()
