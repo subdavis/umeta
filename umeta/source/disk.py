@@ -25,7 +25,7 @@ def scan_for_buckets(source: config.Source) -> Iterator[core.Object]:
         if stat.S_ISDIR(f.st_mode):
             bucket, key = parse_path(r)
             yield core.Object(
-                type=ObjectType.directory,
+                type=core.ObjectType.directory,
                 key=key,
                 bucket=bucket,
                 modified=int(

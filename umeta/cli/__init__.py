@@ -3,7 +3,7 @@ from typing import Iterable, Callable
 
 import click
 
-from umeta import models, config, crud
+from umeta import models, config, crud, source
 from umeta.database import cli_get_db
 
 
@@ -41,10 +41,26 @@ def cli(ctx):
 @click.pass_obj
 def index(ctx, name):
     c = ctx['config']
-    source: config.Source = get_by(c.sources, 'name', name)
     db = ctx['db']
-    for a in crud.index_source(db, source):
-        pass
+    s: config.Source = get_by(c.sources, 'name', name)
+    source_model, _ = crud.get_or_create(db, models.Source, name=s.name)
+    reindex = models.Reindex(source=source_model)
+    db.add(reindex)
+    db.add(source_model)
+    db.commit()
+
+    buckets = [
+        crud.upsert_object(db, b, {}, reindex)
+        for b in source.get_module(s.type).scan_for_buckets(s)
+    ]
+    nodes = []
+    for bucket in buckets:
+        nodes += crud.get_nodes(db, bucket)
+    with click.progressbar(
+        crud.index_source(db, s, reindex), length=len(nodes)
+    ) as bar:
+        for b in bar:
+            pass
 
 
 cli.add_command(index)

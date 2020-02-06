@@ -30,18 +30,9 @@ def get_nodes(db: Session, root: models.Object):
     )
 
 
-def index_source(db: Session, s: config.Source):
-    source_model, _ = get_or_create(db, models.Source, name=s.name)
-    reindex = models.Reindex(source=source_model)
-    db.add(reindex)
-    db.add(source_model)
-    db.commit()
-    bucket = None
+def index_source(db: Session, s: config.Source, reindex: models.Reindex):
     parent_cache = {}
     for i, obj in enumerate(source.get_module(s.type).index(s)):
-        if bucket is None or bucket.name != obj.bucket:
-            bucket = upsert_bucket(db, obj.bucket, reindex, source_model)
-            db.flush()
         if obj.key is not None:
             upsert_object(db, obj, parent_cache, reindex)
         yield i
@@ -49,18 +40,6 @@ def index_source(db: Session, s: config.Source):
     reindex.status = models.ReindexStatus.succeeded
     db.add(reindex)
     db.commit()
-
-
-def get_bucket(db: Session, name: str) -> models.Object:
-    return (
-        db.query(models.Object)
-        .filter(
-            sa.and_(
-                models.Object.name == name, models.Object.parent_id == None
-            )
-        )
-        .first()
-    )
 
 
 def get_parent(
@@ -76,8 +55,16 @@ def get_parent(
         raise ValueError(f'Cannot get parent of bucket {obj.key} {obj.bucket}')
     parent_name = os.path.dirname(path)
     if parent_name == '':
-        b = get_bucket(db, obj.bucket)
-        return b
+        return (
+            db.query(models.Object)
+            .filter(
+                sa.and_(
+                    models.Object.name == obj.bucket,
+                    models.Object.parent_id == None,
+                )
+            )
+            .first()
+        )
     cache_key = f'{obj.bucket}/{parent_name}'
     if cache_key in cache:
         return cache[cache_key]
@@ -103,46 +90,35 @@ def get_parent(
         return parent
 
 
-def upsert_bucket(
-    db: Session, name: str, reindex: models.Reindex, sm: models.Source
-):
-    bucket = get_bucket(db, name)
-    if not bucket:
-        bucket = models.Object(
-            name=name,
-            type=core.ObjectType.directory,
-            modified=datetime.utcnow(),
-            reindex=reindex,
-            source=sm,
-            size=0,
-        )
-        db.add(bucket)
-    return bucket
-
-
 def upsert_object(
     db: Session,
     obj: core.Object,
     parent_cache: Dict[str, models.Object],
     reindex: models.Reindex,
 ) -> models.Object:
-    parent = get_parent(db, obj, parent_cache)
-    if parent is None:
-        raise ValueError(f'cannot create object without existing parent {obj.key}')
-    name = os.path.basename(obj.key)
+    is_bucket = obj.key is None
+
+    name = obj.bucket if is_bucket else os.path.basename(obj.key)
+    parent_id = None if is_bucket else get_parent(db, obj, parent_cache).id
+
+    if parent_id is None and not is_bucket:
+        raise ValueError(
+            f'cannot create object without existing parent {obj.key}'
+        )
+
     obj_model: models.Object = db.query(models.Object).filter(
         sa.and_(
-            models.Object.name == name,
-            models.Object.parent_id == parent.id,
+            models.Object.name == name, models.Object.parent_id == parent_id,
         )
     ).first()
+
     revised = False
     if not obj_model:
         # need to create model
         # TODO: check for copy or move
         obj_model = models.Object(
             name=name,
-            parent_id=parent.id,
+            parent_id=parent_id,
             type=obj.type,
             size=obj.size,
             modified=obj.modified,
@@ -167,6 +143,7 @@ def upsert_object(
         revision = models.Revision(object=obj_model)
         db.add(revision)
     return obj_model
+
 
 def get_or_create(db: Session, model: object, defaults=None, **kwargs):
     existing = db.query(model).filter_by(**kwargs).first()
