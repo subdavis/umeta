@@ -20,10 +20,11 @@ class GeneratorStatus(enum.Enum):
     succeeded = 2
     failed = 3
 
+
 @dataclass
 class Object:
-    key: List[str]
+    key: str
     bucket: str
-    type: ObjectType
-    modified: int
-    size: int
+    type: ObjectType = ObjectType.file
+    modified: int = 0
+    size: int = 0

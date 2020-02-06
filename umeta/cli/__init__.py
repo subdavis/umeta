@@ -43,14 +43,8 @@ def index(ctx, name):
     c = ctx['config']
     source: config.Source = get_by(c.sources, 'name', name)
     db = ctx['db']
-    bucket = crud.get_bucket(db, 'node_modules')
-    with click.progressbar(
-        crud.index_source(db, source),
-        length=len(crud.get_nodes(db, bucket)),
-        label='Indexing',
-    ) as bar:
-        for i in bar:
-            pass
+    for a in crud.index_source(db, source):
+        pass
 
 
 cli.add_command(index)

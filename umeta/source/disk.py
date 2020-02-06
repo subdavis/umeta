@@ -12,9 +12,9 @@ def parse_path(relpath: str) -> Tuple[str, List[str]]:
     bucket = split[0]
     key = split[1:]
     if len(key) == 0 or key[0] == '':
-        return bucket, []
+        return bucket, None
     else:
-        return bucket, key
+        return bucket, os.sep.join(key)
 
 
 def scan_for_buckets(source: config.Source) -> Iterator[core.Object]:
