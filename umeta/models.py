@@ -1,16 +1,30 @@
 import sqlalchemy as sa
 
-from umeta.core import ObjectType, ReindexStatus
+from umeta.core import (
+    DerivativeType,
+    GeneratorStatus,
+    ObjectType,
+    ReindexStatus,
+)
 from umeta.database import Base
+
+
+class Source(Base):
+    name = sa.Column(sa.String, nullable=False)
 
 
 class Generator(Base):
     name = sa.Column(sa.String, nullable=False)
-    version = sa.Column(sa.String, nullable=False, default='0.0.1')
+    ended = sa.Column(sa.DateTime, nullable=True)
+    version = sa.Column(sa.String, nullable=False)
+    status = sa.Column(
+        sa.Enum(GeneratorStatus),
+        nullable=False,
+        default=GeneratorStatus.running,
+    )
 
-
-class Source(Base):
-    name = sa.Column(sa.String, nullable=False, default='default')
+    source_id = sa.Column(sa.Integer, sa.ForeignKey(Source.id), nullable=False)
+    source = sa.orm.relationship('Source')
 
 
 class Reindex(Base):
@@ -34,15 +48,21 @@ class Object(Base):
     )
     parent = sa.orm.relationship('Object', uselist=False)
 
-    # the last reindex where an object was modified
+    # the last reindex where object was modified
     reindex_id = sa.Column(
         sa.Integer, sa.ForeignKey(Reindex.id), nullable=False
     )
-    reindex = sa.orm.relationship('Reindex', uselist=False)
+    reindex = sa.orm.relationship('Reindex', foreign_keys='Object.reindex_id')
+
+    # the last reindex where object was seen
+    seen_reindex_id = sa.Column(
+        sa.Integer, sa.ForeignKey(Reindex.id), nullable=False
+    )
+    seen_reindex = sa.orm.relationship('Reindex', foreign_keys='Object.seen_reindex_id')
 
     # if source is populated, that means this object is a bucket
     source_id = sa.Column(sa.Integer, sa.ForeignKey(Source.id), nullable=True)
-    source = sa.orm.relationship('Source', uselist=False)
+    source = sa.orm.relationship('Source')
 
 
 class Revision(Base):
@@ -50,11 +70,10 @@ class Revision(Base):
     object = sa.orm.relationship('Object')
 
 
-class Metadata(Base):
-    __table_args__ = (
-        sa.UniqueConstraint('object_id', 'generator_id', 'name'),
-    )
+class Derivative(Base):
+    __table_args__ = (sa.UniqueConstraint('generator_id', 'name', 'type'),)
     name = sa.Column(sa.String, nullable=False, default='default')
+    type = sa.Column(sa.Enum(DerivativeType), nullable=False)
     foreign_id = sa.Column(sa.String, nullable=False, unique=True)
 
     generator_id = sa.Column(
@@ -64,3 +83,15 @@ class Metadata(Base):
 
     object_id = sa.Column(sa.Integer, sa.ForeignKey('object.id'))
     object = sa.orm.relationship('Object', backref='metadata', lazy=True)
+
+
+class Dependency(Base):
+    revision_id = sa.Column(
+        sa.Integer, sa.ForeignKey(Revision.id), nullable=False
+    )
+    revision = sa.orm.relationship('Revision')
+
+    derivative_id = sa.Column(
+        sa.Integer, sa.ForeignKey(Derivative.id), nullable=False
+    )
+    derivative = sa.orm.relationship('Derivative')

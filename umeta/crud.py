@@ -7,7 +7,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session, aliased
 from sqlalchemy.sql import label
 
-from umeta import models, config, core, source
+from umeta import generators, models, config, core, sources
 
 
 def get_nodes(db: Session, root: models.Object):
@@ -32,7 +32,7 @@ def get_nodes(db: Session, root: models.Object):
 
 def index_source(db: Session, s: config.Source, reindex: models.Reindex):
     parent_cache = {}
-    for i, obj in enumerate(source.get_module(s.type).index(s)):
+    for i, obj in enumerate(sources.get_module(s.type).index(s)):
         if obj.key is not None:
             upsert_object(db, obj, parent_cache, reindex)
         yield i
@@ -123,6 +123,7 @@ def upsert_object(
             size=obj.size,
             modified=obj.modified,
             reindex=reindex,
+            seen_reindex=reindex,
         )
         revised = True
         db.add(obj_model)
@@ -138,10 +139,11 @@ def upsert_object(
         obj_model.modified = obj.modified
         obj_model.reindex = reindex
         revised = True
-        db.add(obj_model)
     if revised:
         revision = models.Revision(object=obj_model)
         db.add(revision)
+    obj_model.seen_reindex = reindex
+    db.add(obj_model)
     return obj_model
 
 
@@ -155,3 +157,44 @@ def get_or_create(db: Session, model: object, defaults=None, **kwargs):
         instance = model(**params)
         db.add(instance)
         return instance, True
+
+
+def get_outdated_objects(
+    next_generator: models.Generator,
+) -> List[models.Object]:
+    """
+    Derivatives are considered up-to-date if they 
+
+    1. get the last successful run of a generator.
+    2. get any object of the same source with a modification time greater than that.
+    """
+    pass
+
+
+def generate(db: Session, s: config.Source):
+    source_model, created = get_or_create(db, models.Source, name=s.name)
+
+    if created:
+        raise ValueError(f'Cannot run generator for missing source {s.name}.')
+
+    for name in s.generators:
+        generator_module = generators.get_module(name)
+        generator_module_version = generator_module.Version
+        generator_model = models.Generator(
+            name=name, version=generator_module_version, source=source_model,
+        )
+        previous_generator = (
+            db.query(models.Generator)
+            .filter(
+                sa.and_(
+                    models.Generator.name == name,
+                    models.Generator.version == generator_module_version,
+                )
+            )
+            .first()
+        )
+
+        if not previous_generator:
+            # This generator version has never been run
+            # return all known objects in source
+        db.add(generator_module)

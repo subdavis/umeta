@@ -19,6 +19,7 @@ marshmallow-dataclass = "^7.2.1"
 marshmallow-union = "^0.1.12"
 requests = "^2.22.0"
 pyvips = "^2.1.11"
+pillow = "^7.0.0"
 
 [tool.poetry.plugins."console_scripts"]
 "umeta" = "umeta.cli:cli"
@@ -27,4 +28,11 @@ pyvips = "^2.1.11"
 black = "^19.10b0"
 flake8 = "^3.7.9"
 mypy = "^0.761"
-sqlalchemy-stubs = "^0.3"
+isort = "^4.3.21"
+
+[isort]
+line_length = 79
+use_parentheses = true
+include_trailing_comma = true
+multi_line_output = 3
+

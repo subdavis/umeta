@@ -6,7 +6,10 @@
       "name": "disk1",
       "properties": {
         "root": "/home/brandon/tmp"
-      }
+      },
+      "generators": [
+        "exiftags"
+      ]
     }
   ]
 }

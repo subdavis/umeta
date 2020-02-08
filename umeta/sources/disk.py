@@ -5,6 +5,7 @@ import stat
 from typing import Iterator, List, Tuple, Union
 
 from umeta import core, config
+from .utils import Ignore
 
 
 def parse_path(relpath: str) -> Tuple[str, List[str]]:
@@ -46,7 +47,8 @@ def get_bytes(source: config.Source, obj: core.Object):
 def index(source: config.Source) -> Iterator[core.Object]:
     search = os.path.join(os.path.abspath(source.properties.root), '**/*')
     result = glob(search, recursive=True)
-    for r in result:
+    ignorer = Ignore()
+    for r in ignorer.filterIgnored(result):
         f = os.stat(r)
         relpath = os.path.relpath(r, source.properties.root)
         bucket, key = parse_path(relpath)

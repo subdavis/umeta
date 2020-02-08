@@ -2,6 +2,11 @@
 
 Index your files.
 
+## Concepts
+
+* Namespace: a group in which all bucket names are unique.  umeta has only 1 global namespace, so all buckets across all sources must be unique.
+* Source: a named backend.
+
 ## Environment Config
 
 | variable     | default                    | description                |

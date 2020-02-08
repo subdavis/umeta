@@ -25,6 +25,7 @@ class Disk:
 class Source:
     type: str
     name: Optional[str]
+    generators: List[str]
     properties: Union[S3, Disk]
 
 
