@@ -1,5 +1,5 @@
-from datetime import datetime
 import os
+from datetime import datetime
 from typing import Dict, List, Tuple, Union
 from uuid import uuid4
 
@@ -7,7 +7,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session, aliased
 from sqlalchemy.sql import label
 
-from umeta import generators, models, config, core, sources
+from umeta import config, core, generators, models, sources
 
 
 def get_nodes(db: Session, root: models.Object):
@@ -197,4 +197,5 @@ def generate(db: Session, s: config.Source):
         if not previous_generator:
             # This generator version has never been run
             # return all known objects in source
+            pass
         db.add(generator_module)

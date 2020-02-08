@@ -1,10 +1,11 @@
-from datetime import datetime
-from glob import glob
 import os
 import stat
+from datetime import datetime
+from glob import glob
 from typing import Iterator, List, Tuple, Union
 
-from umeta import core, config
+from umeta import config, core
+
 from .utils import Ignore
 
 

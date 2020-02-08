@@ -1,6 +1,7 @@
 from typing import Any, Dict, List
 
 from umeta import models
+
 from . import exiftags
 
 generators: Dict[str, Any] = {

@@ -1,5 +1,6 @@
 import fnmatch
 
+
 class Ignore:
     def __init__(self):
         self.defaultIgnore = ['.umetaignore/*', '.umetaderiv/']

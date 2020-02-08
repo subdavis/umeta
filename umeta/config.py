@@ -1,10 +1,9 @@
-from dataclasses import dataclass, field
 import json
 import os
+from dataclasses import dataclass, field
 from typing import List, Optional, Union
 
 import marshmallow_dataclass
-
 
 DEFAULT_CONFIG_FILE_PATH = 'config/umeta.config.json'
 

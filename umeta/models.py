@@ -58,7 +58,9 @@ class Object(Base):
     seen_reindex_id = sa.Column(
         sa.Integer, sa.ForeignKey(Reindex.id), nullable=False
     )
-    seen_reindex = sa.orm.relationship('Reindex', foreign_keys='Object.seen_reindex_id')
+    seen_reindex = sa.orm.relationship(
+        'Reindex', foreign_keys='Object.seen_reindex_id'
+    )
 
     # if source is populated, that means this object is a bucket
     source_id = sa.Column(sa.Integer, sa.ForeignKey(Source.id), nullable=True)

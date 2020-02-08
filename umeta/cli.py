@@ -1,10 +1,10 @@
 from dataclasses import asdict, dataclass
-from typing import Iterable, Callable
+from typing import Callable, Iterable
 
 import click
 import sqlalchemy as sa
 
-from umeta import models, config, crud, sources, generators
+from umeta import config, crud, generators, models, sources
 from umeta.database import cli_get_db
 
 
@@ -47,7 +47,10 @@ def index(ctx, name):
     try:
         source_model, _ = crud.get_or_create(db, models.Source, name=s.name)
     except sa.exc.OperationalError as err:
-        click.echo(message=f'Could not get source entry.\nDid you `umeta migrate`?', err=True)
+        click.echo(
+            message=f'Could not get source entry.\nDid you `umeta migrate`?',
+            err=True,
+        )
         exit(1)
     reindex = models.Reindex(source=source_model)
     db.add(reindex)

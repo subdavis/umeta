@@ -1,12 +1,15 @@
 from PIL import ExifTags
 
-from umeta import models, core
+from umeta import core, models
 
 from .utils import CheckReturnType, ChildrenArgType
 
 Version = '0.0.1'
 ObjectTypes = (core.ObjectType.file,)
-Extensions = ('.jpg', 'tif',)
+Extensions = (
+    '.jpg',
+    'tif',
+)
 
 
 def check(
