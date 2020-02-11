@@ -10,7 +10,24 @@ from sqlalchemy.sql import label
 from umeta import config, core, generators, models, sources
 
 
-def get_nodes(db: Session, root: models.Object):
+def get_buckets(db: Session, s: config.Source) -> List[models.Object]:
+    source = (
+        db.query(models.Source).filter(models.Source.name == s.name).first()
+    )
+    if source is None:
+        raise ValueError(f'source {s.name} not in database')
+    buckets = (
+        db.query(models.Object)
+        .filter(models.Object.source_id == source.id)
+        .all()
+    )
+    return (
+        source,
+        buckets,
+    )
+
+
+def get_nodes(db: Session, root: models.Object, modified: datetime = None):
     hierarchy = (
         db.query(models.Object, sa.literal(0).label('level'))
         .filter(models.Object.parent_id == root.id)
@@ -23,11 +40,12 @@ def get_nodes(db: Session, root: models.Object):
             children.parent_id == parent.c.id
         )
     )
-    return (
-        db.query(models.Object, hierarchy.c.level)
-        .select_entity_from(hierarchy)
-        .all()
+    q = db.query(models.Object, hierarchy.c.level).select_entity_from(
+        hierarchy
     )
+    if modified:
+        q = q.filter(models.Object.modified >= modified)
+    return q.all()
 
 
 def index_source(db: Session, s: config.Source, reindex: models.Reindex):
@@ -95,6 +113,7 @@ def upsert_object(
     obj: core.Object,
     parent_cache: Dict[str, models.Object],
     reindex: models.Reindex,
+    source: models.Source = None,
 ) -> models.Object:
     is_bucket = obj.key is None
 
@@ -124,6 +143,7 @@ def upsert_object(
             modified=obj.modified,
             reindex=reindex,
             seen_reindex=reindex,
+            source=source,
         )
         revised = True
         db.add(obj_model)
@@ -159,43 +179,52 @@ def get_or_create(db: Session, model: object, defaults=None, **kwargs):
         return instance, True
 
 
-def get_outdated_objects(
-    next_generator: models.Generator,
-) -> List[models.Object]:
-    """
-    Derivatives are considered up-to-date if they 
+def generate(
+    db: Session, s: config.Source
+) -> List[List[Tuple[str, models.Object, List[models.Object]]]]:
 
-    1. get the last successful run of a generator.
-    2. get any object of the same source with a modification time greater than that.
-    """
-    pass
-
-
-def generate(db: Session, s: config.Source):
-    source_model, created = get_or_create(db, models.Source, name=s.name)
-
-    if created:
-        raise ValueError(f'Cannot run generator for missing source {s.name}.')
-
+    source, buckets = get_buckets(db, s)
     for name in s.generators:
         generator_module = generators.get_module(name)
         generator_module_version = generator_module.Version
         generator_model = models.Generator(
-            name=name, version=generator_module_version, source=source_model,
+            name=name, version=generator_module_version, source=source,
         )
-        previous_generator = (
+        db.commit()
+        previous_generator: models.Generator = (
             db.query(models.Generator)
             .filter(
                 sa.and_(
                     models.Generator.name == name,
                     models.Generator.version == generator_module_version,
+                    models.Generator.status == core.GeneratorStatus.succeeded,
                 )
             )
+            .order_by(models.Generator.created.desc())
             .first()
         )
 
-        if not previous_generator:
-            # This generator version has never been run
-            # return all known objects in source
-            pass
-        db.add(generator_module)
+        modified_since = 0
+        if previous_generator:
+            modified_since = int(
+                datetime.timestamp(previous_generator.created)
+            )
+
+        try:
+            for b in buckets:
+                nodes = get_nodes(db, b, modified_since)
+                for node, _ in nodes:
+                    dependencies = generator_module.check(node, None)
+                    if dependencies is not None:
+                        print(dependencies)
+            generator_model.status = core.GeneratorStatus.succeeded
+            generator_model.ended = datetime.utcnow()
+            db.add(generator_model)
+            db.commit()
+        except:
+            db.rollback()
+            generator_model.ended = datetime.utcnow()
+            generator_model.status = core.GeneratorStatus.failed
+            db.add(generator_model)
+            db.commit()
+            raise Exception(f'generation exception for source {name}')

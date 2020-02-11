@@ -21,7 +21,6 @@ def parse_path(relpath: str) -> Tuple[str, List[str]]:
 
 def scan_for_buckets(source: config.Source) -> Iterator[core.Object]:
     results = os.listdir(source.properties.root)
-    buckets = []
     for r in results:
         f = os.stat(os.path.join(source.properties.root, r))
         if stat.S_ISDIR(f.st_mode):

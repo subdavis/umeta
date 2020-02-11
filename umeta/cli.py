@@ -15,6 +15,56 @@ def get_by(iter: Iterable[dataclass], key, value):
     return None
 
 
+def index(c: config.Config, db: sa.orm.Session, name: str):
+    if name is not None:
+        sourcenames = [name]
+    else:
+        sourcenames = [source.name for source in c.sources]
+
+    for sourcename in sourcenames:
+        s: config.Source = get_by(c.sources, 'name', sourcename)
+        if s is None:
+            click.echo(
+                message=f'Source name={sourcename} not found in config.',
+                err=True,
+            )
+            exit(1)
+        try:
+            source_model, _ = crud.get_or_create(
+                db, models.Source, name=s.name
+            )
+        except sa.exc.OperationalError as err:
+            click.echo(
+                message=(
+                    f'Could not get source entry.\n'
+                    f'Did you `umeta migrate`?'
+                ),
+                err=True,
+            )
+            exit(1)
+        reindex = models.Reindex(source=source_model)
+        db.add(reindex)
+        db.add(source_model)
+        db.commit()
+
+        buckets = [
+            crud.upsert_object(db, b, {}, reindex, source_model)
+            for b in sources.get_module(s.type).scan_for_buckets(s)
+        ]
+        bucketnames = ' '.join([b.name for b in buckets])
+        click.echo(
+            f'reindexing {len(buckets)} bucket(s) from source={sourcename}: {bucketnames}'
+        )
+        nodes = []
+        for bucket in buckets:
+            nodes += crud.get_nodes(db, bucket)
+        with click.progressbar(
+            crud.index_source(db, s, reindex), length=len(nodes)
+        ) as bar:
+            for b in bar:
+                pass
+
+
 @click.group()
 @click.pass_context
 def cli(ctx):
@@ -30,7 +80,7 @@ def cli(ctx):
 @click.command(name='generate', help='generate derivitaves')
 @click.option('--name', type=click.STRING, required=True, help='source name')
 @click.pass_obj
-def generate(ctx, generator):
+def generate(ctx, name):
     c = ctx['config']
     db = ctx['db']
     s: config.Source = get_by(c.sources, 'name', name)
@@ -38,37 +88,10 @@ def generate(ctx, generator):
 
 
 @click.command(name='index', help='index a source')
-@click.option('--name', type=click.STRING, required=True, help='source name')
+@click.argument('name', type=click.STRING, required=False)
 @click.pass_obj
-def index(ctx, name):
-    c = ctx['config']
-    db = ctx['db']
-    s: config.Source = get_by(c.sources, 'name', name)
-    try:
-        source_model, _ = crud.get_or_create(db, models.Source, name=s.name)
-    except sa.exc.OperationalError as err:
-        click.echo(
-            message=f'Could not get source entry.\nDid you `umeta migrate`?',
-            err=True,
-        )
-        exit(1)
-    reindex = models.Reindex(source=source_model)
-    db.add(reindex)
-    db.add(source_model)
-    db.commit()
-
-    buckets = [
-        crud.upsert_object(db, b, {}, reindex)
-        for b in sources.get_module(s.type).scan_for_buckets(s)
-    ]
-    nodes = []
-    for bucket in buckets:
-        nodes += crud.get_nodes(db, bucket)
-    with click.progressbar(
-        crud.index_source(db, s, reindex), length=len(nodes)
-    ) as bar:
-        for b in bar:
-            pass
+def _index(ctx, name):
+    index(ctx['config'], ctx['db'], name)
 
 
 @click.command(name='ls')
@@ -89,6 +112,6 @@ def migrate(ctx):
 
 
 cli.add_command(generate)
-cli.add_command(index)
+cli.add_command(_index)
 cli.add_command(ls)
 cli.add_command(migrate)
