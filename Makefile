@@ -1,2 +1,2 @@
 fmt:
-	isort -rc umeta; black .; git status
+	isort -rc umeta; black .;
