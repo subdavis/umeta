@@ -179,6 +179,15 @@ def get_or_create(db: Session, model: object, defaults=None, **kwargs):
         return instance, True
 
 
+def latest_object_revision(db: Session, obj: models.Object) -> models.Revision:
+    return (
+        db.query(sa.sql.func.max(models.Revision.created))
+        .filter(models.Revision.object_id == obj.id)
+        .group_by(models.Revision.object_id)
+        .first()
+    )
+
+
 def generate(
     db: Session, s: config.Source
 ) -> List[List[Tuple[str, models.Object, List[models.Object]]]]:
@@ -214,9 +223,12 @@ def generate(
             for b in buckets:
                 nodes = get_nodes(db, b, modified_since)
                 for node, _ in nodes:
-                    dependencies = generator_module.check(node, None)
-                    if dependencies is not None:
-                        print(dependencies)
+                    # TODO: if type of node is directory, pass children to checker as well.
+                    derivs = generator_module.check(node, None)
+                    filtered = filter_outdated(
+                        db, generator_model, node, derivs
+                    )
+
             generator_model.status = core.GeneratorStatus.succeeded
             generator_model.ended = datetime.utcnow()
             db.add(generator_model)
@@ -228,3 +240,60 @@ def generate(
             db.add(generator_model)
             db.commit()
             raise Exception(f'generation exception for source {name}')
+
+
+def filter_outdated(
+    db: Session,
+    generator: models.Generator,
+    primary: models.Object,
+    derivatives: List[core.Derivative],
+) -> List[Tuple[models.Derivative, List[models.Dependency]]]:
+    """
+    returns only the outdated derivatives.
+    """
+    for der in derivatives:
+        der_model, created = get_or_create(
+            db,
+            models.Derivative,
+            name=der.name,
+            type=der.type,
+            generator_id=generator.id,
+            object_id=primary.id,
+        )
+
+        if created:
+            dependency_models = []
+            for dep in der.dependencies:
+                latest_revision = latest_object_revision(db, dep)
+                dependency_models.append(models.Dependency(
+                    revision=latest_revision,
+                    derivative=der_model,
+                ))
+            yield (der_model, dependency_models)
+
+        else:
+
+            # TODO: check set intersection of returned dependencies and known ones
+
+            # check the revision versions of the existing dependencies
+            deps: List[models.Dependency] = (
+                db.query(models.Dependency)
+                .filter(models.Dependency.derivative_id == der_model.id)
+                .all()
+            )
+            changed = []
+            for dep in deps:
+                latest = latest_object_revision(db, dep.revision.object.id)
+                if latest.id != dep.revision_id:
+                    changed.append(dep)
+            if len(changed):
+                yield (der_model, changed)
+
+
+def recompute(
+    db: Session,
+    outdated_deriv: models.Derivative,
+    outdated_deps: List[models.Dependency],
+):
+    [db.delete(dep) for dep in outdated_deps]
+    new_deps

@@ -1,5 +1,4 @@
 import sqlalchemy as sa
-
 from umeta.core import (
     DerivativeType,
     GeneratorStatus,
