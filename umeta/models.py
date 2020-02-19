@@ -21,7 +21,6 @@ class Generator(Base):
         nullable=False,
         default=GeneratorStatus.running,
     )
-
     source_id = sa.Column(sa.Integer, sa.ForeignKey(Source.id), nullable=False)
     source = sa.orm.relationship('Source')
 
@@ -72,10 +71,10 @@ class Revision(Base):
 
 
 class Derivative(Base):
-    __table_args__ = (sa.UniqueConstraint('generator_id', 'name', 'type'),)
+    __table_args__ = (sa.UniqueConstraint('generator_id', 'name', 'type', 'object_id'),)
     name = sa.Column(sa.String, nullable=False, default='default')
     type = sa.Column(sa.Enum(DerivativeType), nullable=False)
-    foreign_id = sa.Column(sa.String, nullable=False, unique=True)
+    foreign_id = sa.Column(sa.String, nullable=True, unique=True)
 
     generator_id = sa.Column(
         sa.Integer, sa.ForeignKey(Generator.id), nullable=False
@@ -87,6 +86,7 @@ class Derivative(Base):
 
 
 class Dependency(Base):
+    __table_args__ = (sa.UniqueConstraint('revision_id', 'derivative_id'),)
     revision_id = sa.Column(
         sa.Integer, sa.ForeignKey(Revision.id), nullable=False
     )

@@ -180,12 +180,13 @@ def get_or_create(db: Session, model: object, defaults=None, **kwargs):
 
 
 def latest_object_revision(db: Session, obj: models.Object) -> models.Revision:
-    return (
-        db.query(sa.sql.func.max(models.Revision.created))
+    result = (
+        db.query(models.Revision, sa.sql.func.max(models.Revision.created))
         .filter(models.Revision.object_id == obj.id)
         .group_by(models.Revision.object_id)
         .first()
     )
+    return result[0]
 
 
 def generate(
@@ -199,6 +200,7 @@ def generate(
         generator_model = models.Generator(
             name=name, version=generator_module_version, source=source,
         )
+        db.add(generator_model)
         db.commit()
         previous_generator: models.Generator = (
             db.query(models.Generator)
@@ -225,9 +227,12 @@ def generate(
                 for node, _ in nodes:
                     # TODO: if type of node is directory, pass children to checker as well.
                     derivs = generator_module.check(node, None)
-                    filtered = filter_outdated(
-                        db, generator_model, node, derivs
-                    )
+                    if derivs is not None:
+                        filtered = filter_outdated(
+                            db, generator_model, node, derivs
+                        )
+                        for f in filtered:
+                            print(f[0].object_id, len(f[1]))
 
             generator_model.status = core.GeneratorStatus.succeeded
             generator_model.ended = datetime.utcnow()
@@ -240,6 +245,19 @@ def generate(
             db.add(generator_model)
             db.commit()
             raise Exception(f'generation exception for source {name}')
+
+
+def create_dependencies(
+    db: Session, derivative: models.Derivative, revisions: List[models.Revision]
+) -> List[models.Dependency]:
+    ret = []
+    for rev in revisions:
+        new_dep = models.Dependency(
+            revision=rev, derivative=derivative,
+        )
+        db.add(new_dep)
+        ret.append(new_dep)
+    return ret
 
 
 def filter_outdated(
@@ -261,33 +279,41 @@ def filter_outdated(
             object_id=primary.id,
         )
 
-        if created:
-            dependency_models = []
-            for dep in der.dependencies:
-                latest_revision = latest_object_revision(db, dep)
-                dependency_models.append(models.Dependency(
-                    revision=latest_revision,
-                    derivative=der_model,
-                ))
+        if created:  # this is a new derivative, so create all dependencies
+            latest_dep_revisions = [
+                latest_object_revision(db, dep) for dep in der.dependencies
+            ]
+            dependency_models = create_dependencies(
+                db, der_model, latest_dep_revisions
+            )
             yield (der_model, dependency_models)
 
-        else:
-
-            # TODO: check set intersection of returned dependencies and known ones
-
-            # check the revision versions of the existing dependencies
-            deps: List[models.Dependency] = (
+        else:  # check the revision versions of the existing dependencies
+            known_deps: List[models.Dependency] = (
                 db.query(models.Dependency)
                 .filter(models.Dependency.derivative_id == der_model.id)
                 .all()
             )
-            changed = []
-            for dep in deps:
-                latest = latest_object_revision(db, dep.revision.object.id)
-                if latest.id != dep.revision_id:
-                    changed.append(dep)
-            if len(changed):
-                yield (der_model, changed)
+
+            known_dep_revisions_set = set(
+                [dep.revision_id for dep in known_deps]
+            )
+            latest_dep_revisions = []
+            latest_dep_revisions_set = set()
+
+            for dep in der.dependencies:
+                latest = latest_object_revision(db, dep)
+                latest_dep_revisions_set.add(latest.id)
+                latest_dep_revisions.append(latest)
+
+            if known_dep_revisions_set != latest_dep_revisions_set:
+                # destroy all known, and replace with new ones.
+                for dep in known_deps:
+                    db.delete(dep)
+                dependency_models = create_dependencies(
+                    db, der_model, latest_dep_revisions
+                )
+                yield (der_model, dependency_models)
 
 
 def recompute(

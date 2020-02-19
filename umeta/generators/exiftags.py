@@ -8,7 +8,7 @@ Version = '0.0.1'
 ObjectTypes = (core.ObjectType.file,)
 Extensions = (
     '.jpg',
-    'tif',
+    '.tif',
 )
 
 
