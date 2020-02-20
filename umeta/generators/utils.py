@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import Callable, List, Union
 
 from umeta import core, models
 

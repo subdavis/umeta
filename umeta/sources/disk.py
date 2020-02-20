@@ -2,7 +2,7 @@ import os
 import stat
 from datetime import datetime
 from glob import glob
-from typing import Iterator, List, Tuple, Union
+from typing import Iterator, BinaryIO, List, Tuple, Union
 
 from umeta import config, core
 
@@ -36,7 +36,7 @@ def scan_for_buckets(source: config.Source) -> Iterator[core.Object]:
             )
 
 
-def get_bytes(source: config.Source, obj: core.Object):
+def get_bytes(source: config.Source, obj: core.Object) -> BinaryIO:
     if obj.type == ObjectType.directory:
         raise ValueError('cannot open directory for reading')
     abspath = os.path.abspath(source.properties.root)

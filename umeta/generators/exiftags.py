@@ -1,8 +1,9 @@
 from PIL import ExifTags
 
 from umeta import core, models
-
+from umeta.sources.utils import GetBytesType
 from .utils import CheckReturnType, ChildrenArgType
+
 
 Version = '0.0.1'
 ObjectTypes = (core.ObjectType.file,)
@@ -30,6 +31,8 @@ def check(
 
 
 def get(
-    object: models.Object, children: ChildrenArgType,
+    object: models.Object,
+    dependencies: ChildrenArgType,
+    get_bytes: GetBytesType,
 ):
-    print('GET', object.name)
+    pass

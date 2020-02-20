@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-from typing import Dict, List, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 from uuid import uuid4
 
 import sqlalchemy as sa
@@ -24,6 +24,21 @@ def get_buckets(db: Session, s: config.Source) -> List[models.Object]:
     return (
         source,
         buckets,
+    )
+
+
+def get_path(db: Session, obj: models.Object) -> core.Object:
+    obj_model = obj
+    key = []
+    while obj_model.parent_id is not None:
+        key.append(obj_model.name)
+        obj_model = obj_model.parent
+    return core.Object(
+        key=os.sep.join(reversed(key)),
+        bucket=obj_model.name,
+        type=obj.type,
+        modified=obj.modified,
+        size=obj.size,
     )
 
 
@@ -231,8 +246,8 @@ def generate(
                         filtered = filter_outdated(
                             db, generator_model, node, derivs
                         )
-                        for f in filtered:
-                            print(f[0].object_id, len(f[1]))
+                        for der_model, dependency_models in filtered:
+                            yield (generator_module, node, der_model, dependency_models)
 
             generator_model.status = core.GeneratorStatus.succeeded
             generator_model.ended = datetime.utcnow()

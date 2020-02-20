@@ -28,7 +28,13 @@ def get_by(iter: Iterable[dataclass], key, value):
 
 def generate(c: config.Config, db: sa.orm.Session, name: str):
     for s in get_sources(c, name):
-        crud.generate(db, s)
+        outdated = crud.generate(db, s)
+        source_module = sources.get_module(s.type)
+        for gen_module, node, derivative, dependencies in outdated:
+            try:
+                print(crud.get_path(db, node))
+            except ValueError as err:
+                outdated.throw(err)
 
 
 def index(c: config.Config, db: sa.orm.Session, name: str):

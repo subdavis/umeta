@@ -44,7 +44,7 @@ class Object(Base):
     parent_id = sa.Column(
         sa.Integer, sa.ForeignKey('object.id'), nullable=True
     )
-    parent = sa.orm.relationship('Object', uselist=False)
+    parent = sa.orm.relationship('Object', remote_side='Object.id')
 
     # the last reindex where object was modified
     reindex_id = sa.Column(

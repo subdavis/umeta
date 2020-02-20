@@ -1,4 +1,9 @@
 import fnmatch
+from typing import Callable, BinaryIO
+from umeta import config, core
+
+
+GetBytesType = Callable[[config.Source, core.Object], BinaryIO]
 
 
 class Ignore:

@@ -1,6 +1,6 @@
 import enum
 from dataclasses import dataclass
-from typing import List
+from typing import Any, List
 
 
 class ObjectType(enum.Enum):
@@ -32,7 +32,6 @@ class Object:
     type: ObjectType = ObjectType.file
     modified: int = 0
     size: int = 0
-
 
 @dataclass
 class Derivative:
